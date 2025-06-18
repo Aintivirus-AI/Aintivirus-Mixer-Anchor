@@ -1,0 +1,23 @@
+[toolchain]
+
+[features]
+seeds = false
+skip-lint = false
+
+[programs.localnet]
+aintivirus_mixer = "7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi"
+aintivirus = "FQ8uvnRBAMkbxHxZPboh2p5fgYnH4tBDFKSNbYjPY6ne"
+
+[programs.devnet]
+aintivirus_mixer = "7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi"
+aintivirus = "FQ8uvnRBAMkbxHxZPboh2p5fgYnH4tBDFKSNbYjPY6ne"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "localnet"
+wallet = "/home/odmin/.config/solana/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/test.ts"
