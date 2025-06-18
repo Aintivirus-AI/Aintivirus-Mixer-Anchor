@@ -89,11 +89,18 @@ pub mod aintivirus_mixer {
 
         // Check minimum deposit amount (0.5 SOL or 1000 token)
         if mode == 1 || mode == 3 {
+            // mode 1 is SOL to SOL (simple mix)
+            // mode 3 is SOL to ETH (bridged mix)
+             
             require!(
                 deposit_amount >= 500_000_000, // 0.5 SOL in lamports
                 ErrorCode::InvalidMinimumDepositAmount
             );
         } else if mode == 2 || mode == 4 {
+            
+            // mode 2 is AINTI(SPL) to AINTI(SPL) (simple mix)
+            // mode 4 is AINTI(SPL) to AINTI(ERC20) (bridged mix)
+             
             require!(
                 deposit_amount >= 1_000,
                 ErrorCode::InvalidMinimumDepositAmount
@@ -105,6 +112,9 @@ pub mod aintivirus_mixer {
         mix_storage.deposit_commitments_nullifier_hashes.push(commitment);
 
         if mode == 1 || mode == 3 {
+            // mode 1 is SOL to SOL (simple mix)
+            // mode 3 is SOL to ETH (bridged mix)
+
             let ix = system_instruction::transfer(
                 &ctx.accounts.from.key(),
                 &ctx.accounts.escrow_vault_for_sol.key(),
@@ -120,6 +130,9 @@ pub mod aintivirus_mixer {
             )?;
         } 
         else if mode == 2 || mode == 4 {
+            // mode 2 is AINTI(SPL) to AINTI(SPL) (simple mix)
+            // mode 4 is AINTI(SPL) to AINTI(ERC20) (bridged mix)
+
             let transfer_instruction = Transfer{
                 from: ctx.accounts.from_ata.to_account_info(),
                 to: ctx.accounts.escrow_vault.to_account_info(),
@@ -137,6 +150,9 @@ pub mod aintivirus_mixer {
 
         // Register SOL to SOL mixing commitment
         if mode == 1 || mode == 2 {
+            // mode 1 is SOL to SOL (simple mix)
+            // mode 2 is AINTI(SPL) to AINTI(SPL) (simple mix)
+
             require!(
                 !mix_storage.withdraw_commitments.contains(&commitment),
                 ErrorCode::CommitmentAlreadySubmitted

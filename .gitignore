@@ -7,5 +7,6 @@ node_modules
 circuit
 test-ledger
 .yarn
-tests
 scripts
+tests
+util
