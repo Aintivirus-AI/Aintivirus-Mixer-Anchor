@@ -18,7 +18,8 @@ declare_id!("7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi");
 pub mod aintivirus_mixer {
     use super::*;
 
-    pub fn initialize(ctx: Context<Initialize>) -> Result<()> {
+    pub fn initialize(ctx: Context<Initialize>, fee_collector: Pubkey, fee_collector_ata: Pubkey) -> Result<()> {
+        // Initialize the escrow vault for SOL
         let lamports = 1_000_000; // ~0.001 SOL
         let ix = system_instruction::create_account(
             ctx.accounts.signer.key,
@@ -38,9 +39,24 @@ pub mod aintivirus_mixer {
             &[&[b"escrow_vault_for_sol".as_ref(), &[ctx.bumps.escrow_vault_for_sol]]],
         )?;
 
+        // Validate the escrow vualt for SOL
+        let escrow_vault_for_sol = &ctx.accounts.escrow_vault_for_sol;
+        require!(
+            escrow_vault_for_sol.owner == &system_program::ID && escrow_vault_for_sol.data_is_empty(),
+            ErrorCode::InvalidEscrowVault
+        );
+
         // Initialize the mix storage account
         let mix_storage = &mut ctx.accounts.mix_storage;
         mix_storage.maintainer = ctx.accounts.signer.key();
+        mix_storage.fee_collector = fee_collector;
+        mix_storage.fee_collector_ata = fee_collector_ata;
+
+        mix_storage.refund = 1_000_000_0; // 0.01 SOL
+        mix_storage.fee = 500_000_000; // 500 AINTI tokens
+
+        mix_storage.min_sol_deposit = 500_000_000; // 0.5 SOL
+        mix_storage.min_token_deposit = 500_000_000; // 500 AINTI tokens
 
         Ok(())
     }
@@ -93,7 +109,7 @@ pub mod aintivirus_mixer {
             // mode 3 is SOL to ETH (bridged mix)
              
             require!(
-                deposit_amount >= 500_000_000, // 0.5 SOL in lamports
+                deposit_amount >= mix_storage.min_sol_deposit, // 0.5 SOL in lamports
                 ErrorCode::InvalidMinimumDepositAmount
             );
         } else if mode == 2 || mode == 4 {
@@ -102,7 +118,7 @@ pub mod aintivirus_mixer {
             // mode 4 is AINTI(SPL) to AINTI(ERC20) (bridged mix)
              
             require!(
-                deposit_amount >= 1_000,
+                deposit_amount >= mix_storage.min_token_deposit, // 500 AINTI tokens
                 ErrorCode::InvalidMinimumDepositAmount
             );
         } else {
@@ -163,7 +179,7 @@ pub mod aintivirus_mixer {
         Ok(())
     }
 
-    pub fn register_eth_sol_commitment(ctx: Context<RegisterCommitment>, commitment: [u8; 32]) -> Result<()> {
+    pub fn register_eth_sol_commitment(ctx: Context<MaintainerAction>, commitment: [u8; 32]) -> Result<()> {
         let mix_storage = &mut ctx.accounts.mix_storage;
         // let mix_storage_2 = &mut ctx.accounts.mix_storage_2;
         
@@ -240,6 +256,25 @@ pub mod aintivirus_mixer {
                 ],
                 signer_seeds,
             )?;
+
+            // SOL fee transfer process
+            if mix_storage.refund > 0 {
+                // Refund the user
+                let refund_ix = system_instruction::transfer(
+                    &ctx.accounts.escrow_vault_for_sol.key(),
+                    &ctx.accounts.fee_collector.key(),
+                    mix_storage.refund,
+                );
+                invoke_signed(
+                    &refund_ix,
+                    &[
+                        ctx.accounts.escrow_vault_for_sol.to_account_info(),
+                        ctx.accounts.fee_collector.to_account_info(),
+                        ctx.accounts.system_program.to_account_info(),
+                    ],
+                    signer_seeds,
+                )?;
+            }
         }
         else if mode == 2 || mode == 4 {
             // SPL token release; mode 2 is for SOL to SPL token mixing, mode 4 is for ETH to SPL token mixing
@@ -257,6 +292,20 @@ pub mod aintivirus_mixer {
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, transfer_instruction, signer_seeds);
 
             token::transfer(cpi_ctx, amount)?;
+
+            // SPL token fee transfer process
+            if mix_storage.fee > 0 {
+                let fee_transfer_instruction = Transfer {
+                    from: ctx.accounts.escrow_vault.to_account_info(),
+                    to: ctx.accounts.fee_collector_ata.to_account_info(),
+                    authority: ctx.accounts.escrow_vault.to_account_info(),
+                };
+
+                let cpi_program = ctx.accounts.token_program.to_account_info();
+                let cpi_ctx = CpiContext::new_with_signer(cpi_program, fee_transfer_instruction, signer_seeds);
+
+                token::transfer(cpi_ctx, mix_storage.fee)?;
+            }
         } 
         else {
             return Err(ErrorCode::InvalidMode.into());
@@ -265,13 +314,90 @@ pub mod aintivirus_mixer {
         Ok(())
     }
 
-    pub fn validate_commitment(ctx: Context<CommitmentValidation>, commitment: [u8; 32]) -> Result<()> {
+    pub fn validate_commitment(ctx: Context<MaintainerAction>, commitment: [u8; 32]) -> Result<()> {
         let mix_storage = &ctx.accounts.mix_storage;
 
         // Check if the withdrawal commitment exists
         if !mix_storage.withdraw_commitments.contains(&commitment) {
             return Err(ErrorCode::CommitmentNotFound.into());
         }
+
+        Ok(())
+    }
+
+    pub fn set_fee_collector(ctx: Context<MaintainerAction>, fee_collector: Pubkey, fee_collector_ata: Pubkey) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        // Check if fee collector or fee collector ATA is not the same as the current one
+        require!(
+            mix_storage.fee_collector != fee_collector || mix_storage.fee_collector_ata != fee_collector_ata,
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.fee_collector = fee_collector;
+        mix_storage.fee_collector_ata = fee_collector_ata;
+
+        Ok(())
+    }
+
+    pub fn set_refund(ctx: Context<MaintainerAction>, refund: u64) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.refund = refund;
+
+        Ok(())
+    }
+
+    pub fn set_fee(ctx: Context<MaintainerAction>, fee: u64) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.fee = fee;
+
+        Ok(())
+    }
+
+    pub fn set_min_sol_deposit(ctx: Context<MaintainerAction>, min_sol_deposit: u64) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.min_sol_deposit = min_sol_deposit;
+
+        Ok(())
+    }
+
+    pub fn set_min_token_deposit(ctx: Context<MaintainerAction>, min_token_deposit: u64) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.min_token_deposit = min_token_deposit;
 
         Ok(())
     }
@@ -440,9 +566,6 @@ pub struct Deposit<'info> {
     #[account(mut, seeds = [], bump)]
     pub mix_storage: Account<'info, MixStorage>,
 
-    // #[account(mut, seeds = [b"mix_storage_2".as_ref()], bump)]
-    // pub mix_storage_2: Account<'info, MixStorage2>,
-
     pub system_program: Program<'info, System>,
 
     #[account(mut,
@@ -495,21 +618,6 @@ pub struct EscrowCharge<'info> {
 }
 
 #[derive(Accounts)]
-pub struct RegisterCommitment<'info> {
-    #[account(mut)]
-    pub authority: Signer<'info>,
-
-    #[account(mut)]
-    pub signer: Signer<'info>,
-
-    #[account(mut, seeds = [], bump)]
-    pub mix_storage: Account<'info, MixStorage>,
-
-    // #[account(mut, seeds = [b"mix_storage_2".as_ref()], bump)]
-    // pub mix_storage_2: Account<'info, MixStorage2>,
-}
-
-#[derive(Accounts)]
 pub struct Withdraw<'info> {
     pub token_program: Program<'info, Token>,
 
@@ -540,6 +648,15 @@ pub struct Withdraw<'info> {
         bump)]
     pub escrow_vault_for_sol: AccountInfo<'info>,
 
+    /// CHECK: We're only transferring SOL to this address
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut, address = mix_storage.fee_collector)]
+    pub fee_collector: UncheckedAccount<'info>,
+
+    /// CHECK: This is not dangerous because we don't read or write from this account
+    #[account(mut, address = mix_storage.fee_collector_ata)]
+    pub fee_collector_ata: UncheckedAccount<'info>,
+
     /// Token mint.
     pub mint: Account<'info, Mint>,
 
@@ -550,11 +667,17 @@ pub struct Withdraw<'info> {
 pub struct MixStorage {
     deposit_commitments_nullifier_hashes: Vec<[u8; 32]>,
     withdraw_commitments: Vec<[u8; 32]>,
-    maintainer: Pubkey
+    maintainer: Pubkey,
+    min_sol_deposit: u64,
+    min_token_deposit: u64,
+    fee_collector: Pubkey,
+    fee_collector_ata: Pubkey,
+    refund: u64,
+    fee: u64
 }
 
 #[derive(Accounts)]
-pub struct CommitmentValidation<'info> {
+pub struct MaintainerAction<'info> {
     #[account(mut)]
     pub authority: Signer<'info>,
     #[account(mut)]
@@ -588,4 +711,6 @@ pub enum ErrorCode {
     NullifierHashAlreadyUsed,
     #[msg("Failed to parse public inputs")]
     FailedToParsePublicInputs,
+    #[msg("Invalid escrow vault account")]
+    InvalidEscrowVault
 }
