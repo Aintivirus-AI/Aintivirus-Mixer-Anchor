@@ -5,21 +5,21 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-aintivirus_mixer = "7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi"
+aintivirus_mixer = "428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw"
 aintivirus = "FQ8uvnRBAMkbxHxZPboh2p5fgYnH4tBDFKSNbYjPY6ne"
 
 [programs.devnet]
-aintivirus_mixer = "7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi"
+aintivirus_mixer = "428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw"
 aintivirus = "FQ8uvnRBAMkbxHxZPboh2p5fgYnH4tBDFKSNbYjPY6ne"
 
 [programs.mainnet]
-aintivirus_mixer  = "7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi"
+aintivirus_mixer  = "428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "localnet"
+cluster = "https://mainnet.helius-rpc.com/?api-key=7ad67ebb-7608-4f81-b7b1-528f78337d53"
 wallet = "/home/odmin/.config/solana/id.json"
 commitment = "finalized"
 

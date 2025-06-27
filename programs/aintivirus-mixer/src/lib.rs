@@ -12,7 +12,7 @@ use groth16_solana::groth16::Groth16Verifier;
 mod verifying_key;
 use verifying_key::VERIFYINGKEY;
 
-declare_id!("7grL6oHWcuwdBNkqCUrz7JEoHeS5NXv1FDegDr6ViMBi");
+declare_id!("428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw");
 
 #[program]
 pub mod aintivirus_mixer {
@@ -245,7 +245,7 @@ pub mod aintivirus_mixer {
             let ix = system_instruction::transfer(
                 &ctx.accounts.escrow_vault_for_sol.key(),
                 &ctx.accounts.to.key(),
-                amount,
+                amount - mix_storage.refund, // Subtract the refund amount
             );
             invoke_signed(
                 &ix,
@@ -291,7 +291,7 @@ pub mod aintivirus_mixer {
             let cpi_program = ctx.accounts.token_program.to_account_info();
             let cpi_ctx = CpiContext::new_with_signer(cpi_program, transfer_instruction, signer_seeds);
 
-            token::transfer(cpi_ctx, amount)?;
+            token::transfer(cpi_ctx, amount - mix_storage.fee)?;
 
             // SPL token fee transfer process
             if mix_storage.fee > 0 {
@@ -398,6 +398,20 @@ pub mod aintivirus_mixer {
         );
 
         mix_storage.min_token_deposit = min_token_deposit;
+
+        Ok(())
+    }
+
+    pub fn set_maintainer(ctx: Context<MaintainerAction>, maintainer: Pubkey) -> Result<()> {
+        let mix_storage = &mut ctx.accounts.mix_storage;
+
+        // Check if signer is equal to maintainer
+        require!(
+            mix_storage.maintainer == ctx.accounts.authority.key(),
+            ErrorCode::NeedMaintainerRole
+        );
+
+        mix_storage.maintainer = maintainer;
 
         Ok(())
     }
