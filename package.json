@@ -4,6 +4,8 @@
         "initialize": "ts-node scripts/init.ts",
         "charge-sol": "ts-node scripts/charge-sol.ts",
         "charge-token": "ts-node scripts/charge-token.ts",
+        "set-admin": "ts-node scripts/set-admin.ts",
+        "resize-account": "ts-node scripts/resize-account.ts",
         "parse-vk": "node parse_vk_to_rust.js",
         "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
         "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"

@@ -19,7 +19,7 @@ aintivirus_mixer  = "428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "https://mainnet.helius-rpc.com/?api-key=7ad67ebb-7608-4f81-b7b1-528f78337d53"
+cluster = "localnet"
 wallet = "/home/odmin/.config/solana/id.json"
 commitment = "finalized"
 

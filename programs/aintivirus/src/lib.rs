@@ -21,7 +21,7 @@ pub mod aintivirus {
         
         let cpi_context = CpiContext::new(cpi_program, cpi_accounts);
 
-        mint_to(cpi_context, 1000000000000)?;
+        mint_to(cpi_context, 100000000000000)?;
 
         Ok(())
     }

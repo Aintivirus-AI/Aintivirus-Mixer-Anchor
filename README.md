@@ -54,3 +54,18 @@ solana config get
 
 ## Deployed address (Mainnet)
 #### aintivirus_mixer : `GWNpsKtdNy9LEZ4P86VHXGB8d25voFYKQDyvVNMixPcP`
+
+## Redeploy Command Log
+```bash
+solana program write-buffer target/deploy/aintivirus_mixer.so
+DiB5vRZFV8qG8YyKYZ46SDRcZocXa8NuUgnnNTpgb4GT
+
+solana program show DiB5vRZFV8qG8YyKYZ46SDRcZocXa8NuUgnnNTpgb4GT
+
+solana program show 428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw
+
+solana program extend 428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw 8500
+
+solana program upgrade DiB5vRZFV8qG8YyKYZ46SDRcZocXa8NuUgnnNTpgb4GT 428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw --upgrade-authority ~/.config/solana/id.json
+Program Id: 428L2unZJtHemoLLtaEAotJGk1Hkoj6nHp5tDUpmKJMw
+```

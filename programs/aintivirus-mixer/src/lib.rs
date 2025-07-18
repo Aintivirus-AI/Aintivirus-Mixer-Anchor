@@ -465,6 +465,18 @@ pub mod aintivirus_mixer {
         // msg!("Proof is valid!");
         // Ok(())
     }
+
+    pub fn resize_mix_storage(ctx: Context<ResizeMixStorage>) -> Result<()> {
+        msg!("Resized mix_storage account");
+        Ok(())
+    }
+
+    pub fn append_mix_storage(ctx: Context<AppendMixStorage>, new_size: u64) -> Result<()> {
+        msg!("MixStorage account reallocated to {} bytes", new_size);
+
+        // Reallocation happens automatically due to the realloc attribute
+        Ok(())
+    }
 }
 
 fn verify_proof(
@@ -727,4 +739,41 @@ pub enum ErrorCode {
     FailedToParsePublicInputs,
     #[msg("Invalid escrow vault account")]
     InvalidEscrowVault
+}
+
+#[derive(Accounts)]
+pub struct ResizeMixStorage<'info> {
+    #[account(
+        mut,
+        realloc = 10240, // 10KB
+        realloc::payer = signer,
+        realloc::zero = false,
+        seeds = [],
+        bump
+    )]
+    pub mix_storage: Account<'info, MixStorage>,
+
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(new_size: u64)]
+pub struct AppendMixStorage<'info> {
+    #[account(
+        mut,
+        realloc = new_size as usize + 8,
+        realloc::payer = signer,
+        realloc::zero = false,
+        seeds = [],
+        bump
+    )]
+    pub mix_storage: Account<'info, MixStorage>,
+
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
 }
